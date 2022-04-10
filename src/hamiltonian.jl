@@ -1,11 +1,24 @@
-# TODO: add a type for kinetic energy
+abstract type AbstractKinetic end
 
-struct Hamiltonian{M<:AbstractMetric, Tlogπ, T∂logπ∂θ}
+struct GaussianKinetic end
+
+struct RelativisticKinetic{T}
+    "Mass"
+    m::T
+    "Speed of light"
+    c::T
+end
+
+struct Hamiltonian{M<:AbstractMetric, K, Tlogπ, T∂logπ∂θ}
     metric::M
+    kinetic::K
     ℓπ::Tlogπ
     ∂ℓπ∂θ::T∂logπ∂θ
 end
-Base.show(io::IO, h::Hamiltonian) = print(io, "Hamiltonian(metric=$(h.metric))")
+Base.show(io::IO, h::Hamiltonian) = print(io, "Hamiltonian(metric=$(h.metric), kinetic=$(h.kinetic))")
+
+# By default we use Gaussian kinetic energy; also to ensure backward compatibility at the time this was introduced
+Hamiltonian(metric, ℓπ, ∂ℓπ∂θ) = Hamiltonian(metric, GaussianKinetic(), ℓπ, ∂ℓπ∂θ)
 
 struct DualValue{V<:AbstractScalarOrVec{<:AbstractFloat}, G<:AbstractVecOrMat{<:AbstractFloat}}
     value::V    # cached value, e.g. logπ(θ)
