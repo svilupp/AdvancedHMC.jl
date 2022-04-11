@@ -1,14 +1,3 @@
-abstract type AbstractKinetic end
-
-struct GaussianKinetic end
-
-struct RelativisticKinetic{T}
-    "Mass"
-    m::T
-    "Speed of light"
-    c::T
-end
-
 struct Hamiltonian{M<:AbstractMetric, K, Tlogπ, T∂logπ∂θ}
     metric::M
     kinetic::K
@@ -18,7 +7,7 @@ end
 Base.show(io::IO, h::Hamiltonian) = print(io, "Hamiltonian(metric=$(h.metric), kinetic=$(h.kinetic))")
 
 # By default we use Gaussian kinetic energy; also to ensure backward compatibility at the time this was introduced
-Hamiltonian(metric, ℓπ, ∂ℓπ∂θ) = Hamiltonian(metric, GaussianKinetic(), ℓπ, ∂ℓπ∂θ)
+Hamiltonian(metric::AbstractMetric, ℓπ::Function, ∂ℓπ∂θ::Function) = Hamiltonian(metric, GaussianKinetic(), ℓπ, ∂ℓπ∂θ)
 
 struct DualValue{V<:AbstractScalarOrVec{<:AbstractFloat}, G<:AbstractVecOrMat{<:AbstractFloat}}
     value::V    # cached value, e.g. logπ(θ)
@@ -48,6 +37,11 @@ end
 ∂H∂r(h::Hamiltonian{<:UnitEuclideanMetric}, r::AbstractVecOrMat) = copy(r)
 ∂H∂r(h::Hamiltonian{<:DiagEuclideanMetric}, r::AbstractVecOrMat) = h.metric.M⁻¹ .* r
 ∂H∂r(h::Hamiltonian{<:DenseEuclideanMetric}, r::AbstractVecOrMat) = h.metric.M⁻¹ * r
+
+function ∂H∂r(h::Hamiltonian{<:UnitEuclideanMetric,<:RelativisticKinetic}, r::AbstractVecOrMat)
+    mass = h.kinetic.m .* sqrt.(r.^2 ./ (h.kinetic.m.^2 * h.kinetic.c.^2) .+ 1)
+    return r ./ mass
+end
 
 struct PhasePoint{T<:AbstractVecOrMat{<:AbstractFloat}, V<:DualValue}
     θ::T  # Position variables / model parameters.
@@ -126,6 +120,14 @@ neg_energy(
     θ::T
 ) where {T<:AbstractVector} = -sum(abs2, r) / 2
 
+function neg_energy(
+    h::Hamiltonian{<:UnitEuclideanMetric,<:RelativisticKinetic},
+    r::T,
+    θ::T
+) where {T<:AbstractVector}
+    return -sum(h.kinetic.m .* h.kinetic.c.^2 .* sqrt.(r.^2 ./ (h.kinetic.m.^2 .* h.kinetic.c.^2) .+ 1))
+end
+
 neg_energy(
     h::Hamiltonian{<:UnitEuclideanMetric},
     r::T,
@@ -163,7 +165,7 @@ phasepoint(
     rng::Union{AbstractRNG, AbstractVector{<:AbstractRNG}},
     θ::AbstractVecOrMat{T},
     h::Hamiltonian
-) where {T<:Real} = phasepoint(h, θ, rand(rng, h.metric))
+) where {T<:Real} = phasepoint(h, θ, rand(rng, h.metric, h.kinetic))
 
 abstract type AbstractMomentumRefreshment end
 
@@ -175,7 +177,7 @@ refresh(
     ::FullMomentumRefreshment,
     h::Hamiltonian,
     z::PhasePoint,
-) = phasepoint(h, z.θ, rand(rng, h.metric))
+) = phasepoint(h, z.θ, rand(rng, h.metric, h.kinetic))
 
 """
 Partial momentum refreshment with refresh rate `α`.
@@ -199,4 +201,4 @@ refresh(
     ref::PartialMomentumRefreshment,
     h::Hamiltonian,
     z::PhasePoint,
-) = phasepoint(h, z.θ, ref.α * z.r + sqrt(1 - ref.α^2) * rand(rng, h.metric))
+) = phasepoint(h, z.θ, ref.α * z.r + sqrt(1 - ref.α^2) * rand(rng, h.metric, h.kinetic))
