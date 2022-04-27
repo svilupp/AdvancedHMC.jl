@@ -43,6 +43,13 @@ function ∂H∂r(h::Hamiltonian{<:UnitEuclideanMetric,<:RelativisticKinetic}, r
     return r ./ mass
 end
 
+function ∂H∂r(h::Hamiltonian{<:DiagEuclideanMetric,<:RelativisticKinetic}, r::AbstractVecOrMat)
+    r = h.metric.sqrtM⁻¹ .* r
+    mass = h.kinetic.m .* sqrt.(r.^2 ./ (h.kinetic.m.^2 * h.kinetic.c.^2) .+ 1)
+    retval = r ./ mass # red part of (15)
+    return h.metric.sqrtM⁻¹ .* retval # (15)
+end
+
 struct PhasePoint{T<:AbstractVecOrMat{<:AbstractFloat}, V<:DualValue}
     θ::T  # Position variables / model parameters.
     r::T  # Momentum variables
@@ -125,6 +132,15 @@ function neg_energy(
     r::T,
     θ::T
 ) where {T<:AbstractVector}
+    return -sum(h.kinetic.m .* h.kinetic.c.^2 .* sqrt.(r.^2 ./ (h.kinetic.m.^2 .* h.kinetic.c.^2) .+ 1))
+end
+
+function neg_energy(
+    h::Hamiltonian{<:DiagEuclideanMetric,<:RelativisticKinetic},
+    r::T,
+    θ::T
+) where {T<:AbstractVector}
+    r = h.metric.sqrtM⁻¹ .* r
     return -sum(h.kinetic.m .* h.kinetic.c.^2 .* sqrt.(r.^2 ./ (h.kinetic.m.^2 .* h.kinetic.c.^2) .+ 1))
 end
 

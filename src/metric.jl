@@ -120,6 +120,18 @@ function _rand(
     return r
 end
 
+# TODO Support AbstractVector{<:AbstractRNG}
+function _rand(
+    rng::AbstractRNG,
+    metric::DiagEuclideanMetric{T},
+    kinetic::RelativisticKinetic{T},
+) where {T}
+    r = _rand(rng, UnitEuclideanMetric(size(metric)), kinetic)
+    # p' = A p where A = sqrtM
+    r ./= metric.sqrtM⁻¹
+    return r
+end
+
 function _rand(
     rng::Union{AbstractRNG, AbstractVector{<:AbstractRNG}},
     metric::DenseEuclideanMetric{T},
